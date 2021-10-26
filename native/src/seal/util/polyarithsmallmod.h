@@ -524,10 +524,13 @@ namespace seal
             });
         }
 
+
+        //4号:最内层,多项式系数的数量,实现在cpp文件内: result = poly[i]*scalar mod modulus
         void multiply_poly_scalar_coeffmod(
             ConstCoeffIter poly, std::size_t coeff_count, MultiplyUIntModOperand scalar, const Modulus &modulus,
             CoeffIter result);
 
+        //3号: 处理scalar 和 quotient
         inline void multiply_poly_scalar_coeffmod(
             ConstCoeffIter poly, std::size_t coeff_count, std::uint64_t scalar, const Modulus &modulus,
             CoeffIter result)
@@ -538,6 +541,7 @@ namespace seal
             multiply_poly_scalar_coeffmod(poly, coeff_count, temp_scalar, modulus, result);
         }
 
+        // 2号:RNS的p的数量
         inline void multiply_poly_scalar_coeffmod(
             ConstRNSIter poly, std::size_t coeff_modulus_size, std::uint64_t scalar, ConstModulusIter modulus,
             RNSIter result)
@@ -560,12 +564,13 @@ namespace seal
                 throw std::invalid_argument("incompatible iterators");
             }
 #endif
-            auto poly_modulus_degree = result.poly_modulus_degree();
+            auto poly_modulus_degree = result.poly_modulus_degree(); //多项式有多少个系数
             SEAL_ITERATE(iter(poly, modulus, result), coeff_modulus_size, [&](auto I) {
                 multiply_poly_scalar_coeffmod(get<0>(I), poly_modulus_degree, scalar, get<1>(I), get<2>(I));
             });
         }
 
+        //1号:首先是这个函数,size是多项式数量
         inline void multiply_poly_scalar_coeffmod(
             ConstPolyIter poly_array, std::size_t size, std::uint64_t scalar, ConstModulusIter modulus, PolyIter result)
         {
@@ -587,7 +592,7 @@ namespace seal
                 throw std::invalid_argument("incompatible iterators");
             }
 #endif
-            auto coeff_modulus_size = result.coeff_modulus_size();
+            auto coeff_modulus_size = result.coeff_modulus_size();  //系数摸--有几个q
             SEAL_ITERATE(iter(poly_array, result), size, [&](auto I) {
                 multiply_poly_scalar_coeffmod(get<0>(I), coeff_modulus_size, scalar, modulus, get<1>(I));
             });

@@ -73,7 +73,7 @@ namespace seal
             RNSIter secret_key(secret_key_.data().data(), coeff_count);
             sample_poly_ternary(parms.random_generator()->create(), parms, secret_key);
 
-            // Transform the secret s into NTT representation.
+            // Transform the secrets into NTT representation.
             auto ntt_tables = context_data.small_ntt_tables();
             ntt_negacyclic_harvey(secret_key, coeff_modulus_size, ntt_tables);
 
@@ -151,6 +151,7 @@ namespace seal
 
         // Assume the secret key is already transformed into NTT form.
         ConstPolyIter secret_key(secret_key_array_.get(), coeff_count, coeff_modulus_size);
+        // secret_key+1 就是 s^2, NTT形态
         generate_kswitch_keys(secret_key + 1, count, static_cast<KSwitchKeys &>(relin_keys), save_seed);
 
         // Set the parms_id
@@ -327,13 +328,18 @@ namespace seal
 
         SEAL_ITERATE(iter(new_key, key_modulus, destination, size_t(0)), decomp_mod_count, [&](auto I) {
             SEAL_ALLOCATE_GET_COEFF_ITER(temp, coeff_count, pool_);
+            // destination[i] 的(c[0], c[1]) = ([-(as+e)]_q, a),对于每一个i,内容是一样的?
             encrypt_zero_symmetric(
                 secret_key_, context_, key_context_data.parms_id(), true, save_seed, get<2>(I).data());
+            // factor = key_modulus.back  mod  key_modulus_i  这个factor就是evakey的p
             uint64_t factor = barrett_reduce_64(key_modulus.back().value(), get<1>(I));
+            // temp = s^2[i] * factor
             multiply_poly_scalar_coeffmod(get<0>(I), coeff_count, factor, get<1>(I), temp);
 
             // We use the SeqIter at get<3>(I) to find the i-th RNS factor of the first destination polynomial.
-            CoeffIter destination_iter = (*iter(get<2>(I).data()))[get<3>(I)];
+            CoeffIter destination_iter = (*iter(get<2>(I).data()))[get<3>(I)]; // 这个*iter()是什么意思?
+            // destination[i][0][i] += s^2 * factor  mod  key_modulus_i   //这个[0]可以这么理解吗?  //只有i=i时,才加 s^2
+            // * factor  mod  key_modulus_i
             add_poly_coeffmod(destination_iter, temp, coeff_count, get<1>(I), destination_iter);
         });
     }

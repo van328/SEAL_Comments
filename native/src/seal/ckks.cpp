@@ -12,6 +12,7 @@ namespace seal
 {
     CKKSEncoder::CKKSEncoder(const SEALContext &context) : context_(context)
     {
+        // printf("****\n***\n******\n**\n");
         // Verify parameters
         if (!context_.parameters_set())
         {

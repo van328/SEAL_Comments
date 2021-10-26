@@ -99,8 +99,8 @@ void example_ckks_basics()
     Decryptor decryptor(context, secret_key);
 
     CKKSEncoder encoder(context);
-    size_t slot_count = encoder.slot_count();
-    cout << "Number of slots: " << slot_count << endl;
+    size_t slot_count = encoder.slot_count();  // slot_ = coeff_count >> 1
+    cout << "Number of slots: " << slot_count << endl;  //4096, not 8192  
 
     vector<double> input;
     input.reserve(slot_count);

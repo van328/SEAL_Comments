@@ -513,24 +513,33 @@ namespace seal
         // Allocate temporary space for the result
         SEAL_ALLOCATE_ZERO_GET_POLY_ITER(temp, dest_size, coeff_count, coeff_modulus_size, pool);
 
+
+        //destsize = 3 by defult
+        //第一轮 i=0
+        //第二轮 i=1
+        //第三轮 i=2
         SEAL_ITERATE(iter(size_t(0)), dest_size, [&](auto I) {
             // We iterate over relevant components of encrypted1 and encrypted2 in increasing order for
             // encrypted1 and reversed (decreasing) order for encrypted2. The bounds for the indices of
             // the relevant terms are obtained as follows.
-            size_t curr_encrypted1_last = min<size_t>(I, encrypted1_size - 1);
-            size_t curr_encrypted2_first = min<size_t>(I, encrypted2_size - 1);
-            size_t curr_encrypted1_first = I - curr_encrypted2_first;
+            size_t curr_encrypted1_last = min<size_t>(I, encrypted1_size - 1); //min(i,1)  --0/1/1
+            size_t curr_encrypted2_first = min<size_t>(I, encrypted2_size - 1); //min(i,1)  --0/1/1
+            size_t curr_encrypted1_first = I - curr_encrypted2_first; //  0/0/1
             // size_t curr_encrypted2_last = secret_power_index - curr_encrypted1_last;
 
             // The total number of dyadic products is now easy to compute
-            size_t steps = curr_encrypted1_last - curr_encrypted1_first + 1;
+            size_t steps = curr_encrypted1_last - curr_encrypted1_first + 1;  //  1/2/1
 
             // Create a shifted iterator for the first input
-            auto shifted_encrypted1_iter = encrypted1_iter + curr_encrypted1_first;
+            auto shifted_encrypted1_iter = encrypted1_iter + curr_encrypted1_first; // encrypted1_iter[0/0/1]
 
             // Create a shifted reverse iterator for the second input
-            auto shifted_reversed_encrypted2_iter = reverse_iter(encrypted2_iter + curr_encrypted2_first);
+            //这个倒序主要用在计算d1那步
+            auto shifted_reversed_encrypted2_iter = reverse_iter(encrypted2_iter + curr_encrypted2_first);  //0/1/1  
 
+            //第一次: c0c'1  temp0 += c0c'0 mod pi    ----d0
+            //第二次: c0c'0  temp1 += c0c'1 mod pi + c1c'0 mod pi   ----d1
+            //第三次: c1c'1  temp2 += c1c'1 mod pi     ----d2
             SEAL_ITERATE(iter(shifted_encrypted1_iter, shifted_reversed_encrypted2_iter), steps, [&](auto J) {
                 // Extra care needed here:
                 // temp_iter must be dereferenced once to produce an appropriate RNSIter
@@ -835,13 +844,15 @@ namespace seal
         size_t relins_needed = encrypted_size - destination_size;
 
         // Iterator pointing to the last component of encrypted
+        // 只处理d2,不处理d0,d1
         auto encrypted_iter = iter(encrypted);
         encrypted_iter += encrypted_size - 1;
 
+        //
         SEAL_ITERATE(iter(size_t(0)), relins_needed, [&](auto I) {
             this->switch_key_inplace(
                 encrypted, *encrypted_iter, static_cast<const KSwitchKeys &>(relin_keys),
-                RelinKeys::get_index(encrypted_size - 1 - I), pool);
+                RelinKeys::get_index(encrypted_size - 1 - I), pool);  //3-1-0-2 = 0
         });
 
         // Put the output of final relinearization into destination.
@@ -2082,9 +2093,10 @@ namespace seal
             throw logic_error("invalid parameters");
         }
 
-        // Prepare input
+        // Prepare input  
+        //  relin  index = 0
         auto &key_vector = kswitch_keys.data()[kswitch_keys_index];
-        size_t key_component_count = key_vector[0].data().size();
+        size_t key_component_count = key_vector[0].data().size();// 2--0和1
 
         // Check only the used component in KSwitchKeys.
         for (auto &each_key : key_vector)
@@ -2097,9 +2109,11 @@ namespace seal
 
         // Create a copy of target_iter
         SEAL_ALLOCATE_GET_RNS_ITER(t_target, coeff_count, decomp_modulus_size, pool);
+        //t_target = target_iter (d2)
         set_uint(target_iter, decomp_modulus_size * coeff_count, t_target);
-
+        
         // In CKKS t_target is in NTT form; switch back to normal form
+        // t_target 是非ntt的, target_iter 是ntt的
         if (scheme == scheme_type::ckks)
         {
             inverse_ntt_negacyclic_harvey(t_target, decomp_modulus_size, key_ntt_tables);
@@ -2108,7 +2122,16 @@ namespace seal
         // Temporary result
         auto t_poly_prod(allocate_zero_poly_array(key_component_count, coeff_count, rns_modulus_size, pool));
 
+
+         // (rns_modulus_size = decomp_modulus_size + 1;) 
+         // parms = encrypted.params decomp_modulus_size = parms.coeff_modulus().size();  
+         // 没有看到modup,应该先有个modup呀
+         // 第一层循环  ----用来换key_modulus[], 结果的个数正好是rns_modulus_size(最后还要一次moddown)
+         // 一共三层 把modup和relin都包含了 , modup
         SEAL_ITERATE(iter(size_t(0)), rns_modulus_size, [&](auto I) {
+            // key_index = i; 
+            // 最后一个i时, key_index = key_modulus_size - 1
+            // 也就是说modup的最后一个p(这里是key_index)使用的是key_modulus中的最后一个special prime
             size_t key_index = (I == decomp_modulus_size ? key_modulus_size - 1 : I);
 
             // Product of two numbers is up to 60 + 60 = 120 bits, so we can sum up to 256 of them without reduction.
@@ -2122,17 +2145,19 @@ namespace seal
             PolyIter accumulator_iter(t_poly_lazy.get(), 2, coeff_count);
 
             // Multiply with keys and perform lazy reduction on product's coefficients
+            /* 第二层循环--1   ---用来换t_operand -- target_iter[]---d2[]
+                                 用d2[j]模上一层选中的mod   */
             SEAL_ITERATE(iter(size_t(0)), decomp_modulus_size, [&](auto J) {
                 SEAL_ALLOCATE_GET_COEFF_ITER(t_ntt, coeff_count, pool);
                 ConstCoeffIter t_operand;
 
                 // RNS-NTT form exists in input
-                if ((scheme == scheme_type::ckks) && (I == J))
+                if ((scheme == scheme_type::ckks) && (I == J))  
                 {
-                    t_operand = target_iter[J];
+                    t_operand = target_iter[J]; //target_iter 本身就是ntt的, t_target 是非ntt的
                 }
                 // Perform RNS-NTT conversion
-                else
+                else//模完之后重新ntt
                 {
                     // No need to perform RNS conversion (modular reduction)
                     if (key_modulus[J] <= key_modulus[key_index])
@@ -2150,14 +2175,26 @@ namespace seal
                 }
 
                 // Multiply with keys and modular accumulate products in a lazy fashion
+                // key_component_count==2 (0和1)
+                /*第三层循环--1  ---- key_component_count--c0和c1
+                               ---- 对第二层循环的key_vector[j] 进行操作 */
+                // 所以d2 和 relin key是交叉着乘的?
+                // 结果存在 accumulator_iter
                 SEAL_ITERATE(iter(key_vector[J].data(), accumulator_iter), key_component_count, [&](auto K) {
                     if (!lazy_reduction_counter)
                     {
+                        // 第四层循环 ---coeff_count
                         SEAL_ITERATE(iter(t_operand, get<0>(K)[key_index], get<1>(K)), coeff_count, [&](auto L) {
                             unsigned long long qword[2]{ 0, 0 };
+                            // qword = (d2)[j][l] mod p[i] * relinkey[j][k][key_index--i][l]   
+                            // 对于每个j,relinkey[j][k][key_index--i][l] 的内容是一样的,但是有j=key_index时,才有 s^2 * special_prime  mod  key_modulus_i 
                             multiply_uint64(get<0>(L), get<1>(L), qword);
 
+                            // 对于所有的j,累加到accumulator_iter[k][l]上 , 每个i有一个accumulator_iter(t_poly_lazy)
+                            // 把j个结果累加到一起,相当于做了modup?
                             // Accumulate product of t_operand and t_key_acc to t_poly_lazy and reduce
+                            // qword += t_poly_lazy mod key_modulus[key_index]
+                            // accumulator_iter[k][l][0] += qword mod key_modulus[key_index]
                             add_uint128(qword, get<2>(L).ptr(), qword);
                             get<2>(L)[0] = barrett_reduce_128(qword, key_modulus[key_index]);
                             get<2>(L)[1] = 0;
@@ -2180,12 +2217,15 @@ namespace seal
                 {
                     lazy_reduction_counter = lazy_reduction_summand_bound;
                 }
-            });
+            });// 第二层循环--1
 
+
+            // 这个t_poly_prod_iter[k][l] 代替了前面的是一个accumulator_iter[k][l]
             // PolyIter pointing to the destination t_poly_prod, shifted to the appropriate modulus
             PolyIter t_poly_prod_iter(t_poly_prod.get() + (I * coeff_count), coeff_count, rns_modulus_size);
 
             // Final modular reduction
+            // 第二层循环--2
             SEAL_ITERATE(iter(accumulator_iter, t_poly_prod_iter), key_component_count, [&](auto K) {
                 if (lazy_reduction_counter == lazy_reduction_summand_bound)
                 {
@@ -2200,24 +2240,28 @@ namespace seal
                         get<1>(L) = barrett_reduce_128(get<0>(L).ptr(), key_modulus[key_index]);
                     });
                 }
-            });
-        });
+            });// 第二层循环--2
+        });// 第一层循环
         // Accumulated products are now stored in t_poly_prod
 
-        // Perform modulus switching with scaling
+        // Perform modulus switching with scaling, moddown掉最后的special prime
+        // 第一层循环--2   key_component_count=2
         PolyIter t_poly_prod_iter(t_poly_prod.get(), coeff_count, rns_modulus_size);
         SEAL_ITERATE(iter(encrypted, t_poly_prod_iter), key_component_count, [&](auto I) {
             // Lazy reduction; this needs to be then reduced mod qi
-            CoeffIter t_last(get<1>(I)[decomp_modulus_size]);
+            CoeffIter t_last(get<1>(I)[decomp_modulus_size]); //t_last就是mod special_p(qk)的一组
             inverse_ntt_negacyclic_harvey_lazy(t_last, key_ntt_tables[key_modulus_size - 1]);
 
             // Add (p-1)/2 to change from flooring to rounding.
+            // 只对t_last操作
             uint64_t qk = key_modulus[key_modulus_size - 1].value();
             uint64_t qk_half = qk >> 1;
             SEAL_ITERATE(t_last, coeff_count, [&](auto &J) {
                 J = barrett_reduce_64(J + qk_half, key_modulus[key_modulus_size - 1]);
             });
 
+
+            //第二层循环
             SEAL_ITERATE(iter(I, key_modulus, key_ntt_tables, modswitch_factors), decomp_modulus_size, [&](auto J) {
                 SEAL_ALLOCATE_GET_COEFF_ITER(t_ntt, coeff_count, pool);
 
@@ -2258,6 +2302,7 @@ namespace seal
                 }
 
                 // ((ct mod qi) - (ct mod qk)) mod qi
+                // t_poly_prod_iter[k] += qi_lazy - t_ntt[k]
                 SEAL_ITERATE(iter(get<0, 1>(J), t_ntt), coeff_count, [&](auto K) { get<0>(K) += qi_lazy - get<1>(K); });
 
                 // qk^(-1) * ((ct mod qi) - (ct mod qk)) mod qi

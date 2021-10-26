@@ -85,8 +85,8 @@ namespace seal
             bit_count_ = get_significant_bit_count(value_);
 
             // Compute Barrett ratios for 64-bit words (barrett_reduce_128)
-            uint64_t numerator[3]{ 0, 0, 1 };
-            uint64_t quotient[3]{ 0, 0, 0 };
+            uint64_t numerator[3]{ 0, 0, 1 };  //分子
+            uint64_t quotient[3]{ 0, 0, 0 };  //商
 
             // Use a special method to avoid using memory pool
             divide_uint192_inplace(numerator, value_, quotient);

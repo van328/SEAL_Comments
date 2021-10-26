@@ -30,7 +30,11 @@ namespace seal
 
             SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
                 uint64_t rand = dist(engine);
-                uint64_t flag = static_cast<uint64_t>(-static_cast<int64_t>(rand == 0));
+                uint64_t flag = static_cast<uint64_t>(-static_cast<int64_t>(rand == 0));//0和0xffffffff
+
+                //rand = 0， flag=0xfff...ffff, dest = mod.value-1 ; (-1)
+                //rand = 1, flag = 0, dest = 0
+                //rand = 2, flag = 0, dest = 1;
                 SEAL_ITERATE(
                     iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size,
                     [&](auto J) { *get<0>(J) = rand + (flag & get<1>(J).value()) - 1; });
@@ -225,7 +229,9 @@ namespace seal
                         ntt_negacyclic_harvey(u.get() + i * coeff_count, ntt_tables[i]);
                     }
                     add_poly_coeffmod(
-                        u.get() + i * coeff_count, destination.data(j) + i * coeff_count, coeff_count, coeff_modulus[i],
+                        u.get() + i * coeff_count, destination.data(j) + i * coeff_count, 
+                        coeff_count, 
+                        coeff_modulus[i],
                         destination.data(j) + i * coeff_count);
                 }
             }

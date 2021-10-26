@@ -12,6 +12,7 @@ int main()
     while (true)
     {
         cout << "+---------------------------------------------------------+" << endl;
+        cout << "+----------------*************-------------------------+" << endl;
         cout << "| The following examples should be executed while reading |" << endl;
         cout << "| comments in associated files in native/examples/.       |" << endl;
         cout << "+---------------------------------------------------------+" << endl;

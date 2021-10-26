@@ -436,7 +436,7 @@ namespace seal
             quotient[1] = 0;
             quotient[2] = 0;
 
-            // Determine significant bits in numerator and denominator.
+            // Determine significant bits in numerator and denominator.分子和分母
             int numerator_bits = get_significant_bit_count_uint(numerator, uint64_count);
             int denominator_bits = get_significant_bit_count(denominator);
 

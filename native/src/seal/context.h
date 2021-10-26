@@ -253,7 +253,7 @@ namespace seal
         /**
         Class to hold pre-computation data for a given set of encryption parameters.
         */
-        class ContextData
+        class ContextData //嵌套类，对外隐藏这一层实现
         {
             friend class SEALContext;
 
@@ -490,6 +490,7 @@ namespace seal
         @param[in] sec_level Determines whether a specific security level should be
         enforced according to HomomorphicEncryption.org security standard
         */
+       //这个
         SEALContext(
             const EncryptionParameters &parms, bool expand_mod_chain = true,
             sec_level_type sec_level = sec_level_type::tc128)

@@ -273,6 +273,7 @@ namespace seal
                 auto value_copy(allocate_uint(size_, pool));
                 set_uint(value, size_, value_copy.get());
 
+                // SEAL_ITERATE: first,size,func
                 SEAL_ITERATE(iter(value, base_), size_, [&](auto I) {
                     get<0>(I) = modulo_uint(value_copy.get(), size_, get<1>(I));
                 });
@@ -712,21 +713,27 @@ namespace seal
             size_t base_q_size = base_q_->size();
             CoeffIter last_input = input[base_q_size - 1];
 
-            // Add (qi-1)/2 to change from flooring to rounding
+            // Add qk/2 to change from flooring to rounding  
             Modulus last_modulus = (*base_q_)[base_q_size - 1];
             uint64_t half = last_modulus.value() >> 1;
+            //last_input = (ct + qk/2) mod qk
             add_poly_scalar_coeffmod(last_input, coeff_count_, half, last_modulus, last_input);
 
             SEAL_ALLOCATE_GET_COEFF_ITER(temp, coeff_count_, pool);
             SEAL_ITERATE(iter(input, inv_q_last_mod_q_, base_q_->base()), base_q_size - 1, [&](auto I) {
-                // (ct mod qk) mod qi
+                // temp = (ct + qk/2) mod qk mod qi
                 modulo_poly_coeffs(last_input, coeff_count_, get<2>(I), temp);
 
                 // Subtract rounding correction here; the negative sign will turn into a plus in the next subtraction
+                // half_mod = qk/2 mod qi
                 uint64_t half_mod = barrett_reduce_64(half, get<2>(I));
+                // temp = [ (ct +qk/2 mod qk) mod qi  - qk/2 mod qi ] mod qi   这里的减相当与加: Add qk/2 to change from flooring to rounding
+                //scalar表示标量,b为标量
                 sub_poly_scalar_coeffmod(temp, coeff_count_, half_mod, get<2>(I), temp);
 
                 // (ct mod qi) - (ct mod qk) mod qi
+                // (ct mod qi) - temp
+                // a和b都是向量
                 sub_poly_coeffmod(get<0>(I), temp, coeff_count_, get<2>(I), get<0>(I));
 
                 // qk^(-1) * ((ct mod qi) - (ct mod qk)) mod qi
@@ -756,20 +763,20 @@ namespace seal
             }
 #endif
             size_t base_q_size = base_q_->size();
-            CoeffIter last_input = input[base_q_size - 1];
-
-            // Convert to non-NTT form
+            CoeffIter last_input = input[base_q_size - 1]; //ct mod qk
+            // Convert to non-NTT form  （仅限于 ct mod qk）
             inverse_ntt_negacyclic_harvey(last_input, rns_ntt_tables[base_q_size - 1]);
 
-            // Add (qi-1)/2 to change from flooring to rounding
-            Modulus last_modulus = (*base_q_)[base_q_size - 1];
+            // Add qk/2 to change from flooring to rounding
+            Modulus last_modulus = (*base_q_)[base_q_size - 1]; //qk
             uint64_t half = last_modulus.value() >> 1;
+            // last_input = (ct mod qk  +  qk/2)  mod  qk
             add_poly_scalar_coeffmod(last_input, coeff_count_, half, last_modulus, last_input);
 
-            SEAL_ALLOCATE_GET_COEFF_ITER(temp, coeff_count_, pool);
+            SEAL_ALLOCATE_GET_COEFF_ITER(temp , coeff_count_, pool);
             SEAL_ITERATE(iter(input, inv_q_last_mod_q_, base_q_->base(), rns_ntt_tables), base_q_size - 1, [&](auto I) {
-                // (ct mod qk) mod qi
-                if (get<2>(I).value() < last_modulus.value())
+                //temp = (ct mod qk  +  qk/2)  mod  qk  mod qi
+                if (get<2>(I).value() < last_modulus.value())  //:if qi < qk
                 {
                     modulo_poly_coeffs(last_input, coeff_count_, get<2>(I), temp);
                 }
@@ -779,15 +786,21 @@ namespace seal
                 }
 
                 // Lazy subtraction here. ntt_negacyclic_harvey_lazy can take 0 < x < 4*qi input.
+                // neg_half_mod = qi  -  (qk/2 mod qi)
+                // 相比于不使用ntt的版本,这里多了一个qi
                 uint64_t neg_half_mod = get<2>(I).value() - barrett_reduce_64(half, get<2>(I));
 
                 // Note: lambda function parameter must be passed by reference here
+                //tmp = (ct mod qk  +  qk/2)  mod  qk  mod qi  +  (qi  -  qk/2 mod qi)  ?
                 SEAL_ITERATE(temp, coeff_count_, [&](auto &J) { J += neg_half_mod; });
 #if SEAL_USER_MOD_BIT_COUNT_MAX <= 60
                 // Since SEAL uses at most 60-bit moduli, 8*qi < 2^63.
                 // This ntt_negacyclic_harvey_lazy results in [0, 4*qi).
+                //qi_lazy = 4*qi
                 uint64_t qi_lazy = get<2>(I).value() << 2;
+                //input:temp: (ct mod qk  +  qk/2)  mod  qk  mod qi  +  (qi  -  qk/2 mod qi)
                 ntt_negacyclic_harvey_lazy(temp, get<3>(I));
+                //output: temp: 0-8qi : ct mod qk mod qi
 #else
                 // 2^60 < pi < 2^62, then 4*pi < 2^64, we perfrom one reduction from [0, 4*qi) to [0, 2*qi) after ntt.
                 uint64_t qi_lazy = get<2>(I).value() << 1;
@@ -798,11 +811,18 @@ namespace seal
                     J -= (qi_lazy & static_cast<uint64_t>(-static_cast<int64_t>(J >= qi_lazy)));
                 });
 #endif
-                // Lazy subtraction again, results in [0, 2*qi_lazy),
+                //减法
+                // Lazy subtraction again, results in [0, 2*qi_lazy),  也就是[0, 8*qi)
                 // The reduction [0, 2*qi_lazy) -> [0, qi) is done implicitly in multiply_poly_scalar_coeffmod.
+                // input = ct mod qi (input) + 4*qi - temp
+                // 这里为什么加了4qi,结果就变成(0,8qi了)?  难道之前的范围是(-4qi,8qi)?
                 SEAL_ITERATE(iter(get<0>(I), temp), coeff_count_, [&](auto J) { get<0>(J) += qi_lazy - get<1>(J); });
 
+                //乘法和模
                 // qk^(-1) * ((ct mod qi) - (ct mod qk)) mod qi
+                //multiply_poly_scalar_coeffmod: result = poly[i] * scalar mod modulus
+                           //参数: //     input  ,        coeff_count_,   qk^(-1),     qi,      input
+             //参数:  ((ct mod qi) - (ct mod qk)) mod qi,  coeff_count_,  qk^(-1) mod qi                              
                 multiply_poly_scalar_coeffmod(get<0>(I), coeff_count_, get<1>(I), get<2>(I), get<0>(I));
             });
         }

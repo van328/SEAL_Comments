@@ -120,11 +120,13 @@ namespace seal
         destination.resize(context_, parms_id, 2);
 
         // If asymmetric key encryption
-        if (is_asymmetric)
+        if (is_asymmetric) //非对称
         {
             auto prev_context_data_ptr = context_data.prev_context_data();
             if (prev_context_data_ptr)
             {
+                //为什么非要用previous_parms_id（key param id）,然后再modulus switch？
+
                 // Requires modulus switching
                 auto &prev_context_data = *prev_context_data_ptr;
                 auto &prev_parms_id = prev_context_data.parms_id();
@@ -132,11 +134,13 @@ namespace seal
 
                 // Zero encryption without modulus switching
                 Ciphertext temp(pool);
+                
                 util::encrypt_zero_asymmetric(public_key_, context_, prev_parms_id, is_ntt_form, temp);
 
                 // Modulus switching
+                // temp.size = 2 —— c0和c1
                 SEAL_ITERATE(iter(temp, destination), temp.size(), [&](auto I) {
-                    if (is_ntt_form)
+                    if (is_ntt_form) //ckks
                     {
                         rns_tool->divide_and_round_q_last_ntt_inplace(
                             get<0>(I), prev_context_data.small_ntt_tables(), pool);
@@ -154,11 +158,12 @@ namespace seal
             }
             else
             {
+                //没有prev_context_data的不是不合格的param吗？
                 // Does not require modulus switching
                 util::encrypt_zero_asymmetric(public_key_, context_, parms_id, is_ntt_form, destination);
             }
         }
-        else
+        else//对称
         {
             // Does not require modulus switching
             util::encrypt_zero_symmetric(secret_key_, context_, parms_id, is_ntt_form, save_seed, destination);

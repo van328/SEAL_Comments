@@ -477,13 +477,19 @@ namespace seal
         // more than one modulus in coeff_modulus. This is equivalent to expanding
         // the chain by one step. Otherwise, we set first_parms_id_ to equal
         // key_parms_id_.
+        //(param不合格的时候，设置first_parms_id_ = key_parms_id_;)
         if (!context_data_map_.at(key_parms_id_)->qualifiers_.parameters_set() || parms.coeff_modulus().size() == 1)
         {
             first_parms_id_ = key_parms_id_;
         }
+         //(param合格的时候，设置first_parms_id_ = next_parms_id;)
+         //这相当于把链条扩大了一步
+         //为什么要这样做？
         else
         {
             auto next_parms_id = create_next_context_data(key_parms_id_);
+            //（如果next_param也不合格，设置first_parms_id_ = key_parms_id_，
+            //（否则设置first_parms_id_ = next_parms_id
             first_parms_id_ = (next_parms_id == parms_id_zero) ? key_parms_id_ : next_parms_id;
         }
 

@@ -141,6 +141,7 @@ namespace seal
         parameters
         @throws std::invalid_argument if pool is uninitialized
         */
+
         template <
             typename T, typename = std::enable_if_t<
                             std::is_same<std::remove_cv_t<T>, double>::value ||
@@ -180,6 +181,11 @@ namespace seal
             const std::vector<T> &values, double scale, Plaintext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool())
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+
             encode(values, context_.first_parms_id(), scale, destination, std::move(pool));
         }
 #ifdef SEAL_USE_MSGSL
@@ -214,6 +220,10 @@ namespace seal
             gsl::span<const T> values, parms_id_type parms_id, double scale, Plaintext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool())
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
             encode_internal(
                 values.data(), static_cast<std::size_t>(values.size()), parms_id, scale, destination, std::move(pool));
         }
@@ -246,6 +256,10 @@ namespace seal
             gsl::span<const T> values, double scale, Plaintext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool())
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
             encode(values, context_.first_parms_id(), scale, destination, std::move(pool));
         }
 #endif
@@ -269,10 +283,15 @@ namespace seal
         parameters
         @throws std::invalid_argument if pool is uninitialized
         */
+
         inline void encode(
             double value, parms_id_type parms_id, double scale, Plaintext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool())
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
             encode_internal(value, parms_id, scale, destination, std::move(pool));
         }
 
@@ -296,6 +315,10 @@ namespace seal
         inline void encode(
             double value, double scale, Plaintext &destination, MemoryPoolHandle pool = MemoryManager::GetPool())
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
             encode(value, context_.first_parms_id(), scale, destination, std::move(pool));
         }
 
@@ -322,6 +345,10 @@ namespace seal
             std::complex<double> value, parms_id_type parms_id, double scale, Plaintext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool())
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
             encode_internal(value, parms_id, scale, destination, std::move(pool));
         }
 
@@ -346,6 +373,10 @@ namespace seal
             std::complex<double> value, double scale, Plaintext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool())
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
             encode(value, context_.first_parms_id(), scale, destination, std::move(pool));
         }
 
@@ -362,6 +393,10 @@ namespace seal
         */
         inline void encode(std::int64_t value, parms_id_type parms_id, Plaintext &destination)
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
             encode_internal(value, parms_id, destination);
         }
 
@@ -376,6 +411,10 @@ namespace seal
         */
         inline void encode(std::int64_t value, Plaintext &destination)
         {
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
+            printf("encode-----\n");
             encode(value, context_.first_parms_id(), destination);
         }
 
@@ -440,6 +479,7 @@ namespace seal
             return slots_;
         }
 
+    //是这个
     private:
         template <
             typename T, typename = std::enable_if_t<
@@ -496,7 +536,7 @@ namespace seal
             {
                 conj_values[matrix_reps_index_map_[i]] = values[i];
                 // TODO: if values are real, the following values should be set to zero, and multiply results by 2.
-                conj_values[matrix_reps_index_map_[i + slots_]] = std::conj(values[i]);
+                conj_values[matrix_reps_index_map_[i + slots_]] = std::conj(values[i]); //共厄的值
             }
             double fix = scale / static_cast<double>(n);
             fft_handler_.transform_from_rev(conj_values.get(), util::get_power_of_two(n), inv_root_powers_.get(), &fix);
@@ -529,8 +569,9 @@ namespace seal
                 for (std::size_t i = 0; i < n; i++)
                 {
                     double coeffd = std::round(conj_values[i].real());
-                    bool is_negative = std::signbit(coeffd);
-
+                    bool is_negative = std::signbit(coeffd);  //true if arg is negative, false otherwise
+                    
+                    //u-unsigned 
                     std::uint64_t coeffu = static_cast<std::uint64_t>(std::fabs(coeffd));
 
                     if (is_negative)
