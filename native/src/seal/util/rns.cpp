@@ -728,7 +728,7 @@ namespace seal
                 // half_mod = qk/2 mod qi
                 uint64_t half_mod = barrett_reduce_64(half, get<2>(I));
                 // temp = [ (ct +qk/2 mod qk) mod qi  - qk/2 mod qi ] mod qi   这里的减相当与加: Add qk/2 to change from flooring to rounding
-                //scalar表示标量,b为标量
+                // scalar表示标量,b为标量
                 sub_poly_scalar_coeffmod(temp, coeff_count_, half_mod, get<2>(I), temp);
 
                 // (ct mod qi) - (ct mod qk) mod qi
@@ -815,7 +815,7 @@ namespace seal
                 // Lazy subtraction again, results in [0, 2*qi_lazy),  也就是[0, 8*qi)
                 // The reduction [0, 2*qi_lazy) -> [0, qi) is done implicitly in multiply_poly_scalar_coeffmod.
                 // input = ct mod qi (input) + 4*qi - temp
-                // 这里为什么加了4qi,结果就变成(0,8qi了)?  难道之前的范围是(-4qi,8qi)?
+                // 这里为什么加了4qi,结果就变成(0,8qi了)?  之前的范围是(-4qi,8qi)?
                 SEAL_ITERATE(iter(get<0>(I), temp), coeff_count_, [&](auto J) { get<0>(J) += qi_lazy - get<1>(J); });
 
                 //乘法和模

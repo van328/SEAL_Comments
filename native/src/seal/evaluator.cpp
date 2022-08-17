@@ -545,7 +545,9 @@ namespace seal
                 // temp_iter must be dereferenced once to produce an appropriate RNSIter
                 SEAL_ITERATE(iter(J, coeff_modulus, temp[I]), coeff_modulus_size, [&](auto K) {
                     SEAL_ALLOCATE_GET_COEFF_ITER(prod, coeff_count, pool);
+                    //00-shifted_encrypted1_iter ; 01-shifted_reversed_encrypted2_iter
                     dyadic_product_coeffmod(get<0, 0>(K), get<0, 1>(K), coeff_count, get<1>(K), prod);
+                    // temp[i][k] = prod +  temp[i][k]  mod p[k]
                     add_poly_coeffmod(prod, get<2>(K), coeff_count, get<1>(K), get<2>(K));
                 });
             });
@@ -2113,11 +2115,11 @@ namespace seal
         set_uint(target_iter, decomp_modulus_size * coeff_count, t_target);
         
         // In CKKS t_target is in NTT form; switch back to normal form
-        // t_target 是非ntt的, target_iter 是ntt的
         if (scheme == scheme_type::ckks)
         {
             inverse_ntt_negacyclic_harvey(t_target, decomp_modulus_size, key_ntt_tables);
         }
+        // t_target 是非ntt的, target_iter 是ntt的
 
         // Temporary result
         auto t_poly_prod(allocate_zero_poly_array(key_component_count, coeff_count, rns_modulus_size, pool));
@@ -2125,7 +2127,6 @@ namespace seal
 
          // (rns_modulus_size = decomp_modulus_size + 1;) 
          // parms = encrypted.params decomp_modulus_size = parms.coeff_modulus().size();  
-         // 没有看到modup,应该先有个modup呀
          // 第一层循环  ----用来换key_modulus[], 结果的个数正好是rns_modulus_size(最后还要一次moddown)
          // 一共三层 把modup和relin都包含了 , modup
         SEAL_ITERATE(iter(size_t(0)), rns_modulus_size, [&](auto I) {
@@ -2154,7 +2155,9 @@ namespace seal
                 // RNS-NTT form exists in input
                 if ((scheme == scheme_type::ckks) && (I == J))  
                 {
-                    t_operand = target_iter[J]; //target_iter 本身就是ntt的, t_target 是非ntt的
+                    //target_iter 本身就是ntt的, t_target 是非ntt的
+                    //I=J的时候不需要换模数,所以可以一直保持NTT形式
+                    t_operand = target_iter[J]; 
                 }
                 // Perform RNS-NTT conversion
                 else//模完之后重新ntt
@@ -2176,7 +2179,7 @@ namespace seal
 
                 // Multiply with keys and modular accumulate products in a lazy fashion
                 // key_component_count==2 (0和1)
-                /*第三层循环--1  ---- key_component_count--c0和c1
+                /* 第三层循环--1  ---- key_component_count--c0和c1
                                ---- 对第二层循环的key_vector[j] 进行操作 */
                 // 所以d2 和 relin key是交叉着乘的?
                 // 结果存在 accumulator_iter
@@ -2191,7 +2194,7 @@ namespace seal
                             multiply_uint64(get<0>(L), get<1>(L), qword);
 
                             // 对于所有的j,累加到accumulator_iter[k][l]上 , 每个i有一个accumulator_iter(t_poly_lazy)
-                            // 把j个结果累加到一起,相当于做了modup?
+                            // 把j个结果累加到一起,相当于一起做了modup?
                             // Accumulate product of t_operand and t_key_acc to t_poly_lazy and reduce
                             // qword += t_poly_lazy mod key_modulus[key_index]
                             // accumulator_iter[k][l][0] += qword mod key_modulus[key_index]
@@ -2252,7 +2255,7 @@ namespace seal
             CoeffIter t_last(get<1>(I)[decomp_modulus_size]); //t_last就是mod special_p(qk)的一组
             inverse_ntt_negacyclic_harvey_lazy(t_last, key_ntt_tables[key_modulus_size - 1]);
 
-            // Add (p-1)/2 to change from flooring to rounding.
+            // Add (pk)/2 to change from flooring to rounding.
             // 只对t_last操作
             uint64_t qk = key_modulus[key_modulus_size - 1].value();
             uint64_t qk_half = qk >> 1;
@@ -2306,7 +2309,9 @@ namespace seal
                 SEAL_ITERATE(iter(get<0, 1>(J), t_ntt), coeff_count, [&](auto K) { get<0>(K) += qi_lazy - get<1>(K); });
 
                 // qk^(-1) * ((ct mod qi) - (ct mod qk)) mod qi
+                //t_poly_prod_iter[i][j] *= modswitch_factors[j] mod key_modulus[j]
                 multiply_poly_scalar_coeffmod(get<0, 1>(J), coeff_count, get<3>(J), get<1>(J), get<0, 1>(J));
+                //encrypted[i][j] += t_poly_prod_iter[i][j] mod key_modulus[j]
                 add_poly_coeffmod(get<0, 1>(J), get<0, 0>(J), coeff_count, get<1>(J), get<0, 0>(J));
             });
         });

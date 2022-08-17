@@ -60,6 +60,9 @@
         "typeinfo": "cpp",
         "cinttypes": "cpp",
         "span": "cpp",
-        "gsl_byte": "cpp"
+        "gsl_byte": "cpp",
+        "bitset": "cpp",
+        "codecvt": "cpp",
+        "__nullptr": "cpp"
     }
 }

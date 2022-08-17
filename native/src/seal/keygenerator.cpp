@@ -326,6 +326,7 @@ namespace seal
         // KSwitchKeys data allocated from pool given by MemoryManager::GetPool.
         destination.resize(decomp_mod_count);
 
+        //new_key是s^2; key_modulus是      ;decomp_mod_count是
         SEAL_ITERATE(iter(new_key, key_modulus, destination, size_t(0)), decomp_mod_count, [&](auto I) {
             SEAL_ALLOCATE_GET_COEFF_ITER(temp, coeff_count, pool_);
             // destination[i] 的(c[0], c[1]) = ([-(as+e)]_q, a),对于每一个i,内容是一样的?
@@ -337,9 +338,8 @@ namespace seal
             multiply_poly_scalar_coeffmod(get<0>(I), coeff_count, factor, get<1>(I), temp);
 
             // We use the SeqIter at get<3>(I) to find the i-th RNS factor of the first destination polynomial.
-            CoeffIter destination_iter = (*iter(get<2>(I).data()))[get<3>(I)]; // 这个*iter()是什么意思?
-            // destination[i][0][i] += s^2 * factor  mod  key_modulus_i   //这个[0]可以这么理解吗?  //只有i=i时,才加 s^2
-            // * factor  mod  key_modulus_i
+            CoeffIter destination_iter = (*iter(get<2>(I).data()))[get<3>(I)]; 
+            // destination[i][i] += s^2 * factor  mod  key_modulus_i   //只有i=i时,才加 s^2*factor
             add_poly_coeffmod(destination_iter, temp, coeff_count, get<1>(I), destination_iter);
         });
     }

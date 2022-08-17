@@ -41,6 +41,7 @@ namespace seal
             });
         }
 
+        //正态分布
         void sample_poly_normal(
             shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, uint64_t *destination)
         {
@@ -61,6 +62,8 @@ namespace seal
             SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
                 int64_t noise = static_cast<int64_t>(dist(engine));
                 uint64_t flag = static_cast<uint64_t>(-static_cast<int64_t>(noise < 0));
+                // noise <0 时, flag = 0xfff...fff , destination[i][j] = mod + noise
+                // noise >=0 时, flag = 0 , destination[i][j] = noise
                 SEAL_ITERATE(
                     iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size,
                     [&](auto J) { *get<0>(J) = static_cast<uint64_t>(noise) + (flag & get<1>(J).value()); });
